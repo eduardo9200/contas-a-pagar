@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { get } from "../services/ApiService";
+import { toast } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
 
 const useListaContas = () => {
   const [rows, setRows] = useState([]);
@@ -22,7 +24,7 @@ const useListaContas = () => {
 
       setRows(arr);
     })
-    .catch(err => console.error(err));
+    .catch(err => toast.error('Falha ao buscar dados. ', err));
   }, []);
 
   return { rows };
