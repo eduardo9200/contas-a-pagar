@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { DashboardContainer, Data, InfoTabela, MyButtonGroup, PrimaryButton, SaveButton, TableCellHeader, TableCellStatus, TableContainerMod, TableRowContent } from "./styles";
-import { FaCalendarAlt, FaCalendarCheck, FaCalendarTimes, FaCalendarPlus, FaEdit, FaTrash } from "react-icons/fa";
-import Checkbox from '@mui/material/Checkbox';
+import { DashboardContainer, Data, InfoTabela, MyButtonGroup, PrimaryButton, TableCellHeader, TableCellStatus, TableContainerMod, TableRowContent } from "./styles";
+import { FaCalendarAlt, FaCalendarCheck, FaCalendarTimes, FaCalendarPlus, FaEdit, FaTrash, FaDollarSign } from "react-icons/fa";
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -10,38 +9,26 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper'; 
 import useDateNow from "../../hooks/useDateNow";
 import { Button, ButtonGroup } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import useListaContas from "../../hooks/useListaContas";
+import { deleteResource, patch } from "../../services/ApiService";
+import ConfirmDialog from "../../components/Modal/ConfirmDialog";
 
 const Status = {
-  PAGO: 'PG',
-  VENCIDA: 'VC',
-  ABERTA: 'AB',
-  ABERTA_PERTO_VENCER: 'PV'
+  PAGO: 'PAGO',
+  VENCIDA: 'VENCIDA',
+  ABERTA: 'ABERTA',
+  ABERTA_PERTO_VENCER: 'ABERTA_PERTO_VENCER'
 };
 
-export default function Contas() {
+export default function Dashboard() {
+  const navigate = useNavigate();
   const { dataAtual } = useDateNow();
-  
-  const createData = (
-    id, conta, valor, vencimento, juros, periodoJuros, valorAtualizado, status) => {
-      return { id, conta, valor, vencimento, juros, periodoJuros, valorAtualizado, status };
-  }
-  
-  //FIXME: Criar um hook para capturar o valor do array rows.
-  const rows = [
-    createData(1, 'Frozen yoghurt', 159, '15/01/2024', 24, 'a.m.', 4.0, 'PG'),
-    createData(2, 'Ice cream sandwich', 237, '16/12/2032', 37, 'a.a.', 4.3, 'AB'),
-    createData(3, 'Eclair', 262, '15/04/2024', 24, 'a.d.', 6.0, 'PV'),
-    createData(4, 'Cupcake', 305, '17/05/2013', 67, 'a.m.', 4.3, 'VC'),
-    createData(5, 'Gingerbread', 356, '19/12/1960', 49, 'a.a.', 3.9, 'VC')
-  ];
-  
-  const [checkContasPagas, setCheckContasPagas] = useState(
-    rows.map(r => ({
-        id: r.id,
-        isChecked: r.status === Status.PAGO
-      }
-    ))
-  );
+  const { rows } = useListaContas();
+  const [openDialog, setOpenDialog] = useState(false);
+  const [contaId, setContaId] = useState(null);
     
   const getValorEmReais = (valor) => {
     return valor.toLocaleString('pt-BR', {
@@ -50,8 +37,19 @@ export default function Contas() {
     });
   };
 
+  const ajustarData = (data) => {
+    const str = data.split("-");
+    const novaData = `${str[2]}-${str[1]}-${str[0]}`;
+    return novaData;
+  };
+
   const getTextJuros = (juros, periodoJuros) => {
-    return juros + '% ' + periodoJuros;
+    const ajustaPeriodoJuros = (periodoJuros) => {
+      const letra_1 = periodoJuros.charAt(0).toLowerCase();
+      const letra_2 = periodoJuros.charAt(1).toLowerCase();
+      return `${letra_1}.${letra_2}.`;
+    }
+    return juros + '% ' + ajustaPeriodoJuros(periodoJuros);
   };
 
   const getInfoByStatus = (status) => {
@@ -89,46 +87,51 @@ export default function Contas() {
       return { component, text, color, backgroundColor };
   };
 
-  const handleCheckbox = (event, id) => {
-    const isChecked = event.target.checked;
-
-    let arr = [...checkContasPagas];
-    let index = arr.findIndex(c => c.id === id);
-
-    if (index !== -1) {
-      arr[index].isChecked = isChecked;
-    }
-
-    setCheckContasPagas(arr);
-  };
-
-  const handleSalvarTodasContas = () => {
-    console.log('executando salvar');
-    //Filtra apenas as linhas onde houve alteração do checkbox
-    const alteracoes = checkContasPagas.filter((check, index) => {
-      const isChecked = check.isChecked;
-      const conta = rows[index];
-
-      return (
-        conta.status === Status.PAGO && !isChecked ||
-        conta.status !== Status.PAGO && isChecked
-      );
-    });
-
-    //salva as alterações
-    console.log(alteracoes);
-  };
-
   const handleAlterarConta = (id) => {
-    console.log('clicou alterar', id);
+    navigate(`/conta/${id}`);
   };
 
-  const handleExcluirConta = (id) => {
-    console.log('clicou excluir', id);
+  const handlePagarConta = (id) => {
+    patch(`contas/pagar/${id}`)
+    .then(() => {
+      toast.success('Conta paga com sucesso!');
+      
+      const indexToChangeStatus = rows.findIndex(row => row.id === id);
+
+      if (indexToChangeStatus !== -1) {
+        rows[indexToChangeStatus].status = Status.PAGO;
+      }
+    })
+    .catch((err) => toast.error('Falha ao pagar conta. ', err));
+  };
+
+  const handleOpenDialog = (id) => {
+    setOpenDialog(true);
+    setContaId(id);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setContaId(null);
+  };
+
+  const handleConfirmDelete = () => {
+    deleteResource(`contas/excluir/${contaId}`)
+    .then(() => {
+      toast.success('Removido com sucesso!')
+      
+      const indexToRemove = rows.findIndex(row => row.id === contaId);
+
+      if (indexToRemove !== -1) {
+        rows.splice(indexToRemove, 1);
+      }
+    })
+    .catch((err) => toast.error('Falha ao excluir conta. ', err))
+    .finally(() => setOpenDialog(false));
   };
 
   const navigateToNovaConta = () => {
-    console.log('navegando');
+    navigate('/nova-conta');
   };
 
   function BasicTable() {
@@ -137,13 +140,13 @@ export default function Contas() {
         <Table sx={{ minWidth: 650 }} aria-label="simple table">
           <TableHead>
             <TableRow style={{ backgroundColor: '#F2F2F2' }}>
+              <TableCellHeader>#</TableCellHeader>
               <TableCellHeader>Conta</TableCellHeader>
               <TableCellHeader align="center">Valor</TableCellHeader>
               <TableCellHeader align="center">Vencimento</TableCellHeader>
               <TableCellHeader align="center">Taxa de Juros</TableCellHeader>
               <TableCellHeader align="center">Valor atualizado</TableCellHeader>
               <TableCellHeader align="center">Situação</TableCellHeader>
-              <TableCellHeader align="center">Marcar como Paga</TableCellHeader>
               <TableCellHeader align="center">Opções</TableCellHeader>
             </TableRow>
           </TableHead>
@@ -155,25 +158,28 @@ export default function Contas() {
                   key={`row_${row.id}`}
                   sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                 >
-                  <TableCell component="th" scope="row">
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell component="th" scope="row" style={{ color, backgroundColor }}>
                     {row.conta}
                   </TableCell>
-                  <TableCell align="center">{getValorEmReais(row.valor)}</TableCell>
-                  <TableCell align="center">{row.vencimento}</TableCell>
-                  <TableCell align="center">{getTextJuros(row.juros, row.periodoJuros)}</TableCell>
-                  <TableCell align="center">{getValorEmReais(row.valorAtualizado)}</TableCell>
+                  <TableCell align="center" style={{ color, backgroundColor }}>{getValorEmReais(row.valor)}</TableCell>
+                  <TableCell align="center" style={{ color, backgroundColor }}>{ajustarData(row.vencimento)}</TableCell>
+                  <TableCell align="center" style={{ color, backgroundColor }}>{getTextJuros(row.juros, row.periodoJuros)}</TableCell>
+                  <TableCell align="center" style={{ color, backgroundColor }}>{getValorEmReais(row.valorAtualizado)}</TableCell>
                   <TableCell align="center" style={{ color, backgroundColor }}>
                     <TableCellStatus>
                       {component} {text}
                     </TableCellStatus>
                   </TableCell>
-                  <TableCell align="center"><Checkbox key={`check_${row.id}`} checked={checkContasPagas[index].isChecked} onChange={(e) => handleCheckbox(e, row.id)} /></TableCell>
-                  <TableCell align="center">
-                    <ButtonGroup>
+                  <TableCell align="center" style={{ color, backgroundColor }}>
+                    <ButtonGroup variant="contained" size="small">
+                      <Button color="warning" startIcon={<FaDollarSign size={12} />} onClick={() => handlePagarConta(row.id)}>
+                        Pagar
+                      </Button>
                       <Button color="primary" startIcon={<FaEdit size={12} />} onClick={() => handleAlterarConta(row.id)}>
                         Alterar
                       </Button>
-                      <Button color="error" startIcon={<FaTrash size={12} />} onClick={() => handleExcluirConta(row.id)}>
+                      <Button color="error" startIcon={<FaTrash size={12} />} onClick={() => handleOpenDialog(row.id)}>
                         Excluir
                       </Button>
                     </ButtonGroup>
@@ -192,10 +198,17 @@ export default function Contas() {
       <Data>{dataAtual.toLocaleDateString()}</Data>
       <MyButtonGroup>
         <PrimaryButton onClick={navigateToNovaConta}>Nova Conta</PrimaryButton>
-        <SaveButton onClick={handleSalvarTodasContas}>Salvar</SaveButton>
+        {/*<SaveButton onClick={handleSalvarTodasContas}>Salvar</SaveButton>*/}
       </MyButtonGroup>
       <BasicTable />
       <InfoTabela>* Faltam menos de 07 dias para o vencimento.</InfoTabela>
+      <ConfirmDialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        onConfirm={handleConfirmDelete}
+        title="Confirmar Exclusão"
+        message="Tem certeza que deseja excluir este item?"
+      />
     </DashboardContainer>
   );
 }

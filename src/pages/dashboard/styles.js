@@ -68,7 +68,7 @@ export const TableContainerMod = styled(TableContainer)`
 
 export const TableRowContent = styled(TableRow)`
   &:hover {
-    background-color: #C0FFFF;
+    background-color: #C0FFFF !important;
   }
 `;
 
