@@ -15,6 +15,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import useListaContas from "../../hooks/useListaContas";
 import { deleteResource, patch } from "../../services/ApiService";
 import ConfirmDialog from "../../components/Modal/ConfirmDialog";
+import Header from "../../components/header/Header";
 
 const Status = {
   PAGO: 'PAGO',
@@ -173,7 +174,7 @@ export default function Dashboard() {
                   </TableCell>
                   <TableCell align="center" style={{ color, backgroundColor }}>
                     <ButtonGroup variant="contained" size="small">
-                      <Button color="warning" startIcon={<FaDollarSign size={12} />} onClick={() => handlePagarConta(row.id)}>
+                      <Button color="warning" startIcon={<FaDollarSign size={12} />} onClick={() => handlePagarConta(row.id)} disabled={row.status === Status.PAGO}>
                         Pagar
                       </Button>
                       <Button color="primary" startIcon={<FaEdit size={12} />} onClick={() => handleAlterarConta(row.id)}>
@@ -194,21 +195,23 @@ export default function Dashboard() {
   }
 
   return (
-    <DashboardContainer>
-      <Data>{dataAtual.toLocaleDateString()}</Data>
-      <MyButtonGroup>
-        <PrimaryButton onClick={navigateToNovaConta}>Nova Conta</PrimaryButton>
-        {/*<SaveButton onClick={handleSalvarTodasContas}>Salvar</SaveButton>*/}
-      </MyButtonGroup>
-      <BasicTable />
-      <InfoTabela>* Faltam menos de 07 dias para o vencimento.</InfoTabela>
-      <ConfirmDialog
-        open={openDialog}
-        onClose={handleCloseDialog}
-        onConfirm={handleConfirmDelete}
-        title="Confirmar Exclusão"
-        message="Tem certeza que deseja excluir este item?"
-      />
-    </DashboardContainer>
+    <div>
+      <Header />
+      <DashboardContainer>
+        <Data>{dataAtual.toLocaleDateString()}</Data>
+        <MyButtonGroup>
+          <PrimaryButton onClick={navigateToNovaConta}>Nova Conta</PrimaryButton>
+        </MyButtonGroup>
+        <BasicTable />
+        <InfoTabela>* Faltam menos de 07 dias para o vencimento.</InfoTabela>
+        <ConfirmDialog
+          open={openDialog}
+          onClose={handleCloseDialog}
+          onConfirm={handleConfirmDelete}
+          title="Confirmar Exclusão"
+          message="Tem certeza que deseja excluir este item?"
+        />
+      </DashboardContainer>
+    </div>
   );
 }
